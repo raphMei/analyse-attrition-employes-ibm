@@ -1,0 +1,797 @@
+---
+title: "Analyse des données"
+author: "Année académique 2025"
+subtitle: Réalisé par Abdelhack Malick Adam et Raphaël Meimoun
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    latex_engine: xelatex
+---
+
+------------------------------------------------------------------------
+
+## [**INTRODUCTION**]{.underline}
+
+**Pour ce projet en Science des Données** , nous avons utilisé une base de données trouvée sur le site Kaggle. Notre jeu de données contient des informations sur **1 470 employés** d’une entreprise, avec **13 variables** dont 5 quantitatives et 8 qualitatives.
+
+**Tout au long de ce projet**, nous allons nous interesser à comprendre les différents types d’emplyés dans l’entreprise. Notre travail consistera à étudier les types des profils d’employés, identifer les groupes d’employés ,à comprendre les facteurs qui poussent les employés à quitter ou rester de leurs postes et vérifier s’ils existent des liens entre certaines variables.
+
+**Pour faire cela**, nous allons appliquer les méthodes que nous avons vues en CM, en TP et de notre propre recherche. Nos résultats d’analyses pourraient aider l’entreprise ou bien le RH(ressource humaine) à prendre de décisions suivantes:
+
+-   En identifiant les profils à risque de départ , l’entreprise peut agir pour les retenir .
+
+-   En comprenant quels facteurs favorisent l’évolution professionnelle , l’entreprise peut mieux cibler qui promouvoir et éviter les injustices
+
+-   en bref, ces analyses permettent à l’entreprise d’adapter sa gestion du personnel : anticiper les départs, mieux cibler les promotions, proposer des formations utiles, et garder ses employés motivés.
+
+**Notre jeu de données** ne contient pas des valeurs manquantes(NA) ni de doublon.
+
+Voici la **description de nos variables** :
+
+### **Variables quantitatives:**
+
+**Âge** : l’âge de chaque employé. **Distance_Domicile_Travail** : Indique combien de kilomètres l’employé habite de son lieu de travail.**Salaire_Mensuel** : Ce que gagne l’employé chaque mois.**Nb_Entreprises_Précédentes** : Nombre d’entreprises où la personne a déjà travaillé avant celle-ci. **Ancienneté** : Nombre d’années passées dans l’entreprise actuelle.
+
+### **Variables qualitatives:**
+
+**Attrition** : Précise si l’employé a quitté l’entreprise ou non.**Département** : le service où travaille l’employé ).**Niveau_Éducation** : Montre le niveau d’études atteint (du plus bas au plus élevé). **Domaine_Éducation** : Indique le domaine d’études (ex : sciences etc).**Satisfaction_Environnement** : Évalue le ressenti de l’employé sur son environnement de travail.**Satisfaction_Professionnelle** : Mesure à quel point l’employé est satisfait de son travail.**Statut_Matrimonial** : Indique si l’employé est marié, célibataire ou divorcé.**Équilibre_ViePro_ViePerso** : Évalue si l’employé trouve un bon équilibre entre travail et vie privée.
+
+Maintenant plongeons au coeur de notre analyse.
+
+```{r}
+# On commence par recharger d'un seul coup tous les packages nécessaires pour ce projet
+pacman::p_load(readr, dplyr,DT, knitr, kableExtra,tibble,ggplot2,tidyverse,vtable,factoextra,scales,FactoMineR,gt,ggdendro,psych)
+```
+
+```{r}
+# On charge les données depuis un fichier CSV dans un dataframe nommé "data"
+data <- read.csv("IBM-Attrition-Data.csv")
+
+```
+
+```{r}
+# Voyons un aperçu de notre jeu de données
+   glimpse(data)
+```
+
+Nous allons renommer les variables du jeu de données pour les rendre plus compréhensibles en français, comme la conversion de Age en Âge, Department en Département et MonthlyIncome en Salaire_Mensuel etc. Nous allons également traduire certaines modalités des variables qualitatives, telles que Attrition, Département, et Statut_Matrimonial etc.Enfin, des variables ordinales comme Niveau_Éducation, Satisfaction_Environnement, Équilibre_ViePro_ViePerso et Satisfaction_Professionnelle vont être converties en facteurs ordonnés.
+
+```{r}
+# notre data devient jeu
+jeu <- data
+
+#  Traduction des noms de variables
+jeu <- jeu %>% rename(
+  "Âge" = "Age",
+  "Attrition" = "Attrition",  # On garde tel quel ou on peut traduire par "Départ"
+  "Département" = "Department",
+  "Distance_Domicile_Travail" = "DistanceFromHome",
+  "Niveau_Éducation" = "Education",
+  "Domaine_Éducation" = "EducationField",
+  "Satisfaction_Environnement" = "EnvironmentSatisfaction",
+  "Satisfaction_Professionnelle" = "JobSatisfaction",
+  "Statut_Matrimonial" = "MaritalStatus",
+  "Salaire_Mensuel" = "MonthlyIncome",
+  "Nb_Entreprises_Précédentes" = "NumCompaniesWorked",
+  "Équilibre_ViePro_ViePerso" = "WorkLifeBalance",
+  "Ancienneté" = "YearsAtCompany"
+)
+
+# Traduction des modalités + conversion en facteurs
+jeu <- jeu %>% mutate(
+  Attrition = factor(Attrition, 
+                     levels = c("Yes", "No"),
+                     labels = c("Oui", "Non")),
+  
+  Département = factor(Département,
+                       levels = c("Sales", "Research & Development", "Human Resources"),
+                       labels = c("Ventes", "R&D", "RH")),
+  
+  Domaine_Éducation = factor(Domaine_Éducation,
+                             levels = c("Life Sciences", "Medical", "Marketing", "Technical Degree","Other", "Human Resources"),
+                             labels = c("Sciences de la vie", "Médical", "Marketing", "Diplôme technique", "Autre", "Ressources humaines")),
+  
+  Statut_Matrimonial = factor(Statut_Matrimonial,
+                              levels = c("Single", "Married", "Divorced"),
+                              labels = c("Célibataire", "Marié(e)", "Divorcé(e)"))
+)
+
+# Conversion des variables ordinales en facteurs ordonnés
+jeu <- jeu %>% mutate(
+  Niveau_Éducation = factor(Niveau_Éducation,
+                            levels = 1:5,
+                            labels = c("Sans diplôme", "Bac", "Licence", "Master", "Doctorat"),
+                            ordered = TRUE),
+  
+  Satisfaction_Environnement = factor(Satisfaction_Environnement,
+                                      levels = 1:4,
+                                      labels = c("Très insatisfait", "Insatisfait", "Neutre", "Satisfait"),
+                                      ordered = TRUE),
+  
+  Équilibre_ViePro_ViePerso = factor(Équilibre_ViePro_ViePerso,
+                                     levels = 1:4,
+                                     labels = c("Mauvais", "Moyen", "Bon", "Excellent"),
+                                     ordered = TRUE),
+  
+  Satisfaction_Professionnelle = factor(Satisfaction_Professionnelle,
+                                        levels = 1:4,
+                                        labels = c("Très faible", "Faible", "Élevée", "Très élevée"),
+                                        ordered = TRUE)
+)
+
+
+
+
+```
+
+## [1. Analyse Univariée]{.underline}
+
+Dans cette partie d'analyse univariée, nous allons étudier chaque variable une par une pour mieux comprendre à quoi ressemble chaque variable, d'identifier des erreurs s'ils en existent et préparer le terrain pour la suite.
+
+Nous allons donc explorer chaque variable de manière individuelle de notre jeu de données à travers, de **Diagrammes**, **Boxplots**, **d'Histogrammes** ou encore de **courbes de répartition,** selon le type de variable (quantitative ou qualitative).
+
+Ci-dessous on fait une table statistique de 3 variables qualitatives
+
+```{r warning=FALSE}
+# On compte le nombre d'individus pour chaque combinaison de Département, Attrition et Statut_Matrimonial
+jeu %>%
+  count(Département, Attrition, Statut_Matrimonial) %>%
+
+  # On ajoute une colonne pour calculer le pourcentage d'observations par groupe
+  mutate(
+    pourcentage = round(n / sum(n) * 100, 2),              # Pourcentage arrondi à 2 décimales
+    pourcentage = paste0(pourcentage, "%")                 # On ajoute le symbole % à chaque valeur
+  ) %>%
+
+  # On crée un tableau stylisé avec les noms de colonnes personnalisés
+  kable(
+    caption = "Tableau : Répartition selon le département, l'attrition et le statut matrimonial",
+    col.names = c("Département", "Attrition", "Statut Matrimonial", "Nombre d'individus", "Pourcentage")
+  ) %>%
+
+  # On applique un style général au tableau (bandes alternées, effet survol, etc.)
+  kable_styling(
+    full_width = TRUE,
+    position = "left",
+    bootstrap_options = c("striped", "hover"),
+    font_size = 12
+  ) %>%
+
+  # On applique des couleurs personnalisées à chaque colonne pour mieux visualiser
+  column_spec(1, color = "white", background = "#4CAF50") %>%   # Département → texte blanc sur fond vert
+  column_spec(2, color = "white", background = "#FF6347") %>%   # Attrition → texte blanc sur fond rouge
+  column_spec(3, color = "white", background = "#FFD700") %>%   # Statut Matrimonial → texte blanc sur fond or
+  column_spec(4, color = "black", background = "#E0E0E0") %>%   # Nombre d'individus → texte noir sur fond gris clair
+  column_spec(5, color = "black", background = "#B0E0E6")       # Pourcentage → texte noir sur fond bleu clair
+
+```
+
+On observe que le département R&D concentre la majorité des effectifs, avec notamment 384 employés mariés n’ayant pas quitté l’entreprise (26,12%). À l’inverse, le département RH représente une faible part de l’effectif, avec très peu de cas d’attrition. Les célibataires semblent légèrement touchés par l’attrition, en particulier dans les départements Ventes (3,61%) et R&D (4,49%). Cette répartition permet de cibler les groupes où le taux d’attrition est plus marqué, ce qui peut orienter les actions RH pour améliorer la fidélisation selon le profil et le département.
+
+####     1.2 Diagramme des variables
+
+```{r}
+# On fait un diagramme en barres pour visualiser la répartition de la variable "Attrition"
+
+# Étape 1 : Créer un tableau résumé avec les effectifs et les pourcentages
+data_plot <- jeu %>%
+  count(Attrition) %>%                        # Compte le nombre d'observations pour chaque modalité (Oui / Non)
+  mutate(pourcentage = n / sum(n) * 100)      # Calcule le pourcentage correspondant à chaque modalité
+
+# Étape 2 : Création du graphique avec ggplot2
+p <- ggplot(data_plot, aes(x = Attrition, y = pourcentage)) +   # Définit les axes du graphique (x = Attrition, y = %)
+  geom_bar(stat = "identity", fill = "4477AA", colour = "black", width = 0.4) +  # Crée les barres avec couleur bleue et contour noir
+
+  # Ajoute les étiquettes de pourcentage au-dessus des barres
+  geom_text(
+    aes(label = paste0(round(pourcentage, 1), "%")),  # Arrondi à 1 décimale + symbole %
+    vjust = -0.4,                                     # Décale légèrement le texte vers le haut
+    size = 4,
+    fontface = "bold"                                 # Texte en gras
+  ) +
+
+  # Formatage de l’axe des y pour afficher les % correctement
+  scale_y_continuous(labels = percent_format(scale = 1)) +
+
+  # Étiquettes du graphique
+  ylab("Pourcentage d'individus") +
+  xlab(NULL) +   # Pas de titre pour l’axe des x
+
+  # Titre du graphique
+  ggtitle("Répartition des Personnes selon l'Attrition",
+          subtitle = "Jeu de données employés d'une entreprise ") +
+
+  # Personnalisation de l’apparence du graphique
+  theme(
+    axis.text.x = element_text(angle = 10, hjust = 1, face = "bold"),  # Rotation et mise en gras du texte de l'axe x
+    axis.text.y = element_text(face = "bold"),                         # Texte de l'axe y en gras
+    plot.title = element_text(face = "bold"),                          # Titre en gras
+    axis.title.y = element_text(face = "bold")                         # Titre axe y en gras
+  )
+
+# Affiche le graphique
+p
+
+
+```
+
+Le diagramme en barres ci-dessus présente la répartition des employés selon l'attrition. On observe que 16,1 % des employés ont quitté l'entreprise ("Oui") contre 83,9 % qui sont restés ("Non"). Cela indique un taux d'attrition relativement faible, suggérant une certaine stabilité du personnel. Cependant, ce pourcentage mérite d’être analysé plus en détail pour identifier les éventuelles causes de départ. Des facteurs comme la satisfaction au travail, l’ancienneté, le salaire ou le département peuvent influencer ce taux. Cette information est utile pour orienter l’analyse bivariée ou multivariée à venir.
+
+```{r}
+ #On fait diagramme en barre pour la variable Département     
+         
+# Créer un tableau résumé avec les pourcentages
+data_plot <- jeu %>%
+  count(Département) %>%
+  mutate(pourcentage = n / sum(n) * 100)
+
+# Diagramme en barres
+p <- ggplot(data_plot, aes(x = Département, y = pourcentage)) +
+  geom_bar(stat = "identity", fill = "4477AA", colour = "black", width = 0.4) +
+  geom_text(
+    aes(label = paste0(round(pourcentage, 1), "%")),
+    vjust = -0.4,
+    size = 4,
+    fontface = "bold"
+  ) +
+  scale_y_continuous(labels = percent_format(scale = 1)) +
+  ylab("Pourcentage d'individus") +
+  xlab(NULL) +
+  ggtitle("Répartition des employés par département",
+          subtitle = "Jeu de données employés d'une entreprise ") +
+  theme(
+    axis.text.x = element_text(angle = 10, hjust = 1, face = "bold"),
+    axis.text.y = element_text(face = "bold"),
+    plot.title = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold")
+  )
+
+p
+
+```
+
+Ce diagramme ci-dessus montre que la majorité des employés travaillent dans le département Recherche & Développement(en R&D), ce qui reflète probablement le cœur d’activité de l’entreprise. Le département des Ventes représente une part significative également, tandis que les RH sont faiblement représentés. Cette distribution peut orienter les analyses futures, notamment pour comprendre si l'Attrition est concentrée dans un département spécifique ou si elle est répartie de manière homogène
+
+```{r}
+# Créer un tableau résumé avec les pourcentages
+data_plot <- jeu %>%
+  count(Satisfaction_Professionnelle) %>%
+  mutate(pourcentage = n / sum(n) * 100)
+
+# Diagramme en barres
+p <- ggplot(data_plot, aes(x = Satisfaction_Professionnelle, y = pourcentage)) +
+  geom_bar(stat = "identity", fill = "4477AA", colour = "black", width = 0.4) +
+  geom_text(
+    aes(label = paste0(round(pourcentage, 1), "%")),
+    vjust = -0.4,
+    size = 4,
+    fontface = "bold"
+  ) +
+  scale_y_continuous(labels = percent_format(scale = 1)) +
+  ylab("Pourcentage d'individus") +
+  xlab(NULL) +
+  ggtitle("Niveaux de satisfaction professionnelle des employés",
+          subtitle = "Jeu de données employés d'une entreprise ") +
+  theme(
+    axis.text.x = element_text(angle = 10, hjust = 1, face = "bold"),
+    axis.text.y = element_text(face = "bold"),
+    plot.title = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold")
+  )
+
+p
+
+```
+
+Le diagramme montre que la majorité des employés se disent très satisfaits (31,2 %) ou satisfaits (30,1 **%)** de leur travail. Une plus petite partie exprime une faible satisfaction (19 %) ou très faible (19,7 %).\
+Cela indique que, globalement, la majorité des employés perçoivent positivement leur environnement professionnel, mais qu'une part non négligeable ressent de l’insatisfaction, ce qui pourrait avoir un lien avec le départ de certains employés (attrition)
+
+```{r}
+# Charger les packages nécessaires
+
+# Moyenne et écart-type de l'âge
+moyenne <- mean(jeu$Âge)
+ecart_type <- sd(jeu$Âge)
+
+# Vecteur x pour la fonction de répartition théorique (loi normale)
+x <- seq(from = min(jeu$Âge), to = max(jeu$Âge), length.out = 100)
+fr_theorique <- pnorm(x, mean = moyenne, sd = ecart_type)
+
+# Création du tibble pour la FR théorique
+data_theorique <- tibble(
+  x = x,
+  fr_theorique = fr_theorique
+)
+
+# Graphe combinant FR théorique et FR empirique
+ggplot() +
+  geom_line(data = data_theorique, aes(x = x, y = fr_theorique, colour = "Théorique"), size = 1.2) +
+  stat_ecdf(data = jeu, aes(x = Âge, colour = "Empirique")) +
+  labs(
+    x = "Âge",
+    y = "Fonction de répartition",
+    colour = "Type de FR"
+  ) +
+  scale_color_manual(values = c("Théorique" = "blue", "Empirique" = "red")) +
+  ggtitle("Fonction de répartition : Âge des employés",
+          subtitle = "Comparaison entre la FR empirique et théorique (loi normale)")
+
+```
+
+On oberve que les deux courbes sont plus proches l'une de l'autre. La courbe en rouge correspond à la fonction de répartition empirique tandis que la courbe en blue répresente la fonction de répartition théoriquede l'âge. La majorité des emploiyés ont entre 30 et 50ans c'est une tranche d'âge en pleine d' activité professionnelle.
+
+Cette information peut aider le RH à adapter une pôlitique selon la tranche d’âge dominante (par exemple formations, promotions, préparation à la retraite, etc.).
+
+```{r}
+# Moyenne et écart-type du salaire mensuel
+moyenne <- mean(jeu$Salaire_Mensuel)
+ecart_type <- sd(jeu$Salaire_Mensuel)
+
+#  vecteur x contenantdes salaires
+x <- seq(from = min(jeu$Salaire_Mensuel),
+         to = max(jeu$Salaire_Mensuel),
+         length.out = 100)
+
+# Calcul de la fonction de répartition théorique (loi normale)
+fr_theorique <- pnorm(x, mean = moyenne, sd = ecart_type)
+
+# Mise en forme dans un tibble pour ggplot
+data_theorique <- tibble(
+  x = x,
+  fr_theorique = fr_theorique
+)
+
+# Tracer les deux courbes : théorique (bleue) et empirique (rouge)
+ggplot() +
+  geom_line(data = data_theorique, aes(x = x, y = fr_theorique, colour = "Théorique"), size = 1.2) +
+  stat_ecdf(data = jeu, aes(x = Salaire_Mensuel, colour = "Empirique")) +
+  labs(
+    x = "Salaire mensuel",
+    y = "Fonction de répartition",
+    colour = "Type de FR"
+  ) +
+  scale_color_manual(values = c("Théorique" = "blue", "Empirique" = "red")) +
+  ggtitle("Fonction de répartition : Salaire mensuel",
+          subtitle = "Comparaison entre la FR empirique et théorique (loi normale)")
+
+```
+
+Cette courbe compare la répartition réelle des salaires (en rouge) à une répartition théorique normale (en bleu). On voit que les deux courbes ne sont pas proches. Cela signifie que les salaires ne suivent pas une distribution normale : il y a probablement plus d’employés avec de petits salaires et quelques-uns avec des salaires très élevés. Cela montre une forte inégalité dans les salaires.
+
+####     1.3 Boxplot et Histogramme des variables
+
+```{r}
+# On trace le boxplot de l'âge
+
+ggplot(jeu, aes(x = "", y = Âge)) +
+  # fill= pour remplir la boite en bleu, color= remplir en noir le countour de la boite,width=largeur de la boite
+  geom_boxplot(fill = "4477AA", color = "black", width = 0.3, size = 0.5) +
+  #on calcule la moyenne(fun=mean),on affiche en barre vertical la moyenne(gem=crossbar)
+  stat_summary(fun = mean, geom = "crossbar", color = "red", width = 0.3,
+               linetype = "dashed",  # Style pointillé,
+               size = 0.5  # Épaisseur standard
+               ) +
+  xlab("") +
+  ylab("Âge") +
+  ggtitle("Boxplot de l'âge: Médiane (bleu continu) vs Moyenne (rouge pointillé)") +
+   theme(
+    axis.text = element_text(face = "bold"),
+    axis.title = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 12 , hjust = 0.5)
+   )
+  
+
+```
+
+Le boxplot de la variable Âge montre que l’âge des employés varie entre 18 et 60 ans. Le 1er quartile est à 30 ans, ce qui signifie que 25 % des employés ont moins de 30 ans. La médiane, à 36 ans, indique que la moitié des employés a moins de 36 ans. Le 3e quartile, à 43 ans, montre que 75 % ont moins de 43 ans. La moyenne est de 36,9 ans, très proche de la médiane, ce qui peut dire que la distribution est à peu près symétrique. La majorité des employés a donc entre 30 et 43 ans. Aucun outlier important n’est visible sur le boxplot, ce qui indique une répartition relativement homogène de l’âge dans l’échantillon.
+
+```{r}
+# Tracer de histogramme et densité de l'Age
+
+ggplot(jeu, aes(x = Âge, y = after_stat(density))) +
+  geom_histogram(bins = 30, fill = "4477AA", color = "black") +
+  geom_density(fill = "#4477AA", alpha = 0.2) +
+  xlab("Âge des employés") +
+  ylab("Densité") +
+  ggtitle("Histogramme et courbe de densité de l'âge des employés") +
+  theme(
+    plot.title = element_text(face = "bold"),
+    axis.text = element_text(face = "bold")
+  )
+
+```
+
+La majorité des employés ont entre **30 et 40 ans**, avec un pic autour de **32 ans**, ce qui veut dire que cet âge est le plus fréquent. La distribution n’est pas parfaitement symétrique : il y a un peu plus de personnes jeunes que de personnes plus âgées. On voit aussi que les employés de plus de **50 ans** sont rares. On observe donc un effectif principalement constitué de personnes en âge de maturité professionnelle, ce qui peut influencer les stratégies de gestion des carrières, de formation, ou encore de fidélisation du personnel
+
+```{r}
+# trace de boxplot salaire mensuel
+ggplot(jeu, aes(x = "", y = Salaire_Mensuel)) +
+  geom_boxplot(fill = "445700", color = "black", width = 0.3, size = 0.5, outlier.color = "red", outlier.shape = 16) +
+  stat_summary(fun = mean, geom = "crossbar", color = "red", width = 0.3,
+               linetype = "dashed", size = 0.5) +
+  xlab("") +
+  ylab("Salaire Mensuel") +
+  ggtitle("Boxplot du Salaire Mensuel : Médiane (boîte) vs Moyenne (pointillé rouge)") +
+  theme(
+    axis.text = element_text(face = "bold"),
+    axis.title = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 12, hjust = 0.5)
+  )
+
+
+```
+
+Le boxplot des salaires mensuels montre que la majorité des salaires se situent entre 2911 et 8379 unités monétaires. La médiane des salaires est de 4919, ce qui signifie que la moitié des personnes ont un salaire inférieur ou égal à ce montant. La moyenne est de 6503, ce qui est un peu plus élevé que la médiane, ce qui suggère qu'il y a quelques salaires très élevés qui augmentent la moyenne. Les salaires varient de 1009 à 19999, et on observe quelques valeurs très élevées (des "outliers") qui sont signalées en rouge. Cela montre qu'il y a des personnes qui gagnent beaucoup plus que la majorité. En résumé, le boxplot montre une grande variation des salaires, avec certains salaires qui sont bien plus élevés que la plupart des autres.
+
+```{r}
+jeu %>%
+  ggplot(aes(x = Salaire_Mensuel, y = after_stat(density))) +
+  geom_histogram(color = "black", fill = "red", bins = 30) +
+  geom_density(alpha = 0.2, fill = "blue") +
+  xlab("Salaire mensuel (en unités monétaires)") +
+  ylab("Densité") +
+  ggtitle("Histogramme et courbe de densité des salaires mensuels") +
+  theme(
+    plot.title = element_text(face = "bold"),
+    axis.text = element_text(face = "bold"),
+    axis.title = element_text(face = "bold")
+  )
+
+
+```
+
+La plupart des employés gagnent entre **2000 et 6000 unités monétaires** par mois. On observe une forte concentration autour des bas salaires. La courbe montre aussi qu’il y a quelques salariés qui gagnent beaucoup plus (jusqu’à 20 000), mais ils sont rares.\
+Cela signifie que les salaires sont très inégalement répartis, avec une majorité de salaires modestes et une minorité de très hauts salaires. On peut dire que les personnes qui gagnent beaucoup
+
+La majorité des employés gagnent entre **2 000 et 6 000 unités**. Cela correspond à la zone la plus haute de l’histogramme.On voit que plus le salaire est élevé, moins il y a d’employés. La courbe descend progressivement vers la droite. Cela veut dire que **les salaires élevés (au-dessus de 10 000)** sont rares et concernent sûrement des poste ou niveau diplôme. La courbe de densité en bleu confirme cette forme allongée, avec une longue "queue" vers les hauts salaires. Cela peut suggérer que seules quelques personnes (probablement à des postes de direction ou très techniques) bénéficient de salaires très élevés.
+
+### 1.4 Conclusion
+
+Dans cette partie d'analyse univariée, nous avons étudié chaque variable séparément pour mieux comprendre les caractéristiques des employés de l’entreprise. Les diagrammes, tableaux statistiques, boxplots, histogrammes et courbes de répartition nous ont permis d’avoir un bon aperçu de la répartition des âges, des salaires, de la satisfaction au travail, ou encore de la composition des départements.
+
+On a vu, par exemple, que :
+
+La majorité des employés ont entre 30 et 40 ans.,Les salaires sont très variables, avec quelques employés qui gagnent beaucoup plus que les autres. La satisfaction professionnelle est globalement positive, mais certains restent insatisfaits. Le département R&D concentre le plus grand nombre d’employés. Cette étape nous a donné une vue d’ensemble de chaque variable prise individuellement.
+
+\
+**Maintenant**, il est temps de passer à l’analyse bivariée, qui va nous permettre de croiser deux variables à la fois pour voir s’il existe des liens ou des influences entre elles (par exemple, entre le salaire et l’attrition, ou entre l’âge et la satisfaction).
+
+### 
+
+# [2. Analyse bivariée]{.underline}
+
+Après avoir exploré les variables individuellement, nous cherchons maintenant à comprendre les relations qui peuvent exister entre deux variables à la fois. Ces analyses croisées permettent de repérer des corrélations, des effets ou des associations intéressantes, que ce soit entre deux variables numériques, deux qualitatives, ou un mélange des deux. L’objectif est d’aller au-delà des simples descriptions pour mieux saisir les dynamiques internes du jeu de données.
+
+###   2.1 Relation entre deux variables quantitatives :
+
+    2.1.1Salaire mensuel et Ancienneté
+    
+
+Pour débuter, nous avons calculé une matrice de corrélation entre toutes les variables numériques. Elle nous permet d’identifier rapidement les paires de variables qui évoluent ensemble de manière linéaire.
+
+```{r}
+# Sélection des variables numériques
+donnees_numeriques <- jeu[sapply(jeu, is.numeric)]
+
+# Matrice de corrélation avec la méthode de Pearson
+matrice_correlation <- cor(donnees_numeriques, use = "complete.obs", method = "pearson")
+
+# Affichage
+matrice_correlation
+
+```
+
+La corrélation la plus marquée concerne le salaire mensuel et l’ancienneté, avec un coefficient de 0.51. Cela indique une relation linéaire modérée et positive : en moyenne, plus un employé reste longtemps dans l’entreprise, plus il perçoit un salaire élevé.
+
+###    2.2 Visualisation et modèle de régression
+    
+
+```{r}
+# Nuage de points et droite de régression
+ggplot(jeu, aes(x = Ancienneté, y = Salaire_Mensuel)) +
+  geom_point(alpha = 0.5, color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Salaire mensuel en fonction de l'ancienneté",
+       x = "Ancienneté (années)", y = "Salaire mensuel (USD)")
+```
+
+Le nuage de points montre que plus les années dans l’entreprise augmentent, plus le salaire a tendance à être élevé. La droite rouge représente la régression linéaire ajustée par la méthode des moindres carrés. Toutefois, cela n'explique pas entièrement les variations du salaire. La dispersion des points indique que l’ancienneté n’explique pas entièrement les écarts de salaire. Certains employés avec peu d’ancienneté ont des salaires relativement élevés, ce qui peut s'expliquer par d'autres facteurs comme le poste occupé, le niveau d’études ou le département.
+
+###     2.3 Analyse des résidus 
+    
+
+```{r}
+modele <- lm(Salaire_Mensuel ~ Ancienneté, data = jeu)
+qqnorm(resid(modele), main = "Q-Q plot des résidus")
+qqline(resid(modele), col = "red")
+```
+
+Le Q-Q plot montre que la plupart des résidus suivent la droite théorique, à l’exception de quelques points aux extrémités. Cela indique que la normalité est globalement respectée, mais avec quelques valeurs atypiques.
+
+```{r}
+# Graphe des résidus vs valeurs ajustées
+plot(modele$fitted.values, resid(modele),
+     xlab = "Valeurs ajustées", ylab = "Résidus",
+     main = "Résidus vs valeurs ajustées",
+     pch = 20, col = "darkblue")
+abline(h = 0, col = "red")
+```
+
+Les résidus sont répartis de manière assez aléatoire autour de zéro, ce qui suggère une variance à peu près constante et un lien plutôt linéaire entre ancienneté et salaire. Quelques cas extrêmes pourraient être explorés plus loin.
+
+###   2.4  Conclusion
+
+Oui, il y a bien un lien entre ancienneté et salaire. Mais il n’est ni exclusif ni suffisant pour expliquer toutes les différences salariales. D’autres variables interviennent probablement, et cela justifie pleinement les prochaines étapes de notre étude multivariée.
+
+###  2.5 Relation entre deux variables qualitatives : 
+
+  2.5.1  Attrition vs Statut_Matrimonial
+    
+
+Nous avons ensuite étudié si le fait d’être célibataire, marié ou divorcé avait un impact sur la probabilité de quitter l’entreprise (attrition).
+
+###     2.5.2 Tableau de contingence et diagramme mosaïque
+
+```{r}
+# Tableau de contingence Attrition vs Statut_Matrimonial
+tab <- table(jeu$Statut_Matrimonial, jeu$Attrition)
+tab
+```
+
+Ce tableau montre la répartition des cas d’attrition selon le statut marital. On constate que les employés célibataires représentent une part importante des départs. Par exemple, parmi les salariés ayant quitté l’entreprise, une majorité sont célibataires.
+
+```{r}
+# Diagramme en mosaïque
+mosaicplot(tab, color = TRUE, main = "Attrition selon le statut matrimonial",
+           xlab = "Statut matrimonial", ylab = "Attrition")
+```
+
+Le diagramme met en évidence une proportion d’attrition plus élevée chez les célibataires, ce qui est cohérent avec ce qu’on à observer plus haut
+
+###     2.6 Test d’indépendance (chi\^2)
+
+```{r}
+# Test d'indépendance du khi-deux
+chisq.test(tab)
+```
+
+Le test d’indépendance du chi² donne une p-value très faible (p \< 0.001), ce qui signifie que le lien entre les deux variables est statistiquement significatif. En d’autres termes, le statut marital influence la probabilité qu’un employé quitte l’entreprise.
+
+###    2.7 Conclusion
+        
+
+L’analyse de deux variables qualitatives (Attrition et Statut_Matrimonial) montre que les employés célibataires sont plus susceptibles de quitter l’entreprise, ce qui peut s’expliquer par une plus grande flexibilité géographique ou moins de stabilité personnelle.
+
+###   2.8 Relation entre une variable qualitative et une variable quantitative :
+
+   2.8.1 Département vs Salaire_Mensuel
+    
+
+Enfin, nous avons voulu voir si le département dans lequel travaille un employé a un impact sur son salaire.
+
+###     2.8.2 Visualisation : boxplots groupés
+
+```{r}
+# Boxplot des salaires par département
+ggplot(jeu, aes(x = Département, y = Salaire_Mensuel, fill = Département)) +
+  geom_boxplot() +
+  labs(title = "Salaire mensuel par département",
+       x = "Département", y = "Salaire mensuel (USD)") +
+  theme(legend.position = "none")
+```
+
+Ces boxplots permet de visualiser les différences de distribution du salaire selon les départements. - Les salariés du département Ventes semblent avoir une médiane légèrement plus élevée, mais une grande variabilité des salaires. - En RH, les salaires sont plus regroupés autour de la médiane, et généralement plus faibles. - R&D concentre le plus gros effectif, avec des salaires intermédiaires et relativement homogènes.
+
+###     2.8.3 Analyse de variance (ANOVA)
+        
+
+```{r}
+# ANOVA pour tester l'effet du Département sur le revenu
+anova_dept <- aov(Salaire_Mensuel ~ Département, data = jeu)
+summary(anova_dept)
+```
+
+Le test d’ANOVA renvoie une p-value ≈ 0.041, ce qui indique que la différence des salaires entre au moins deux départements est statistiquement significative au seuil de 5 %. Cela confirme que le département a un effet sur la moyenne des salaires, mais ce test ne nous dit pas encore si cet effet est important ou non en pratique.
+
+###    2.8.4 Rapport de corrélation
+
+```{r}
+# Calcul du rapport de corrélation 
+ss <- summary(anova_dept)[[1]]$`Sum Sq`
+eta2 <- ss[1] / sum(ss)
+eta2
+```
+
+###    2.9  Conclusion
+        
+
+L’analyse entre une variable qualitative (Département) et une quantitative (Salaire_Mensuel) révèle une très faible influence du département sur le salaire. Bien que statistiquement significatif, le rapport de corrélation est très bas ce qui indique que cette variable n’est pas déterminante pour expliquer les différences de revenu.
+
+# [3.Analyse en Composantes Principales (ACP)]{.underline}
+
+Après avoir exploré les variables individuellement (analyse univariée) et par paires (analyse bivariée), nous poursuivons par une analyse en composantes principales (ACP). Cette méthode vise à réduire la dimensionnalité des données tout en conservant l’essentiel de l’information. Elle est particulièrement utile pour repérer des structures sous-jacentes et préparer une classification non supervisée.
+
+###    3.1 Réalisation de l’ACP
+
+Avant toute chose, nous avons sélectionné uniquement les variables numériques et les avons standardisées. Cela garantit que toutes les variables soient mises sur un pied d’égalité dans l’ACP, indépendamment de leurs unités ou de leurs échelles de variation.
+
+```{r}
+# Sélection des variables numériques
+vars_numeriques <- sapply(jeu, is.numeric)
+donnees_quantitatives <- jeu[, vars_numeriques, drop = FALSE]
+
+# Standardisation des données (centrage-réduction)
+donnees_standardisees <- scale(donnees_quantitatives)
+
+# ACP avec FactoMineR
+resultat_acp <- PCA(donnees_standardisees, graph = FALSE)
+```
+
+###    3.2 Cercle des corrélations
+  
+
+L’un des premiers résultats utiles de l’ACP est le cercle des corrélations, qui indique comment chaque variable contribue aux deux premiers axes principaux.
+
+```{r}
+fviz_pca_var(resultat_acp,
+             col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE,
+             title = "Cercle de corrélation des variables")
+```
+
+On observe dans ce graphique que les variables comme l’Âge, l’Ancienneté et le Salaire Mensuel sont fortement corrélées entre elles, formant une direction commune dans le plan factoriel. Cela reflète une dynamique professionnelle attendue : plus un salarié est âgé et ancien dans l’entreprise, plus il a tendance à avoir un salaire élevé.
+
+À l’inverse, le nombre d’entreprises précédentes est pratiquement orthogonal à ces variables : il exprime une autre dimension du parcours professionnel, liée cette fois à la mobilité ou à l’instabilité de carrière. Il est intéressant de voir que ces deux logiques (stabilité interne vs mobilité externe) ressortent naturellement dans l’analyse.
+
+###    3.3 Scree plot
+
+Pour savoir combien d’axes retenir, on regarde combien de variance chaque axe explique.
+
+```{r}
+fviz_eig(resultat_acp,
+         addlabels = TRUE,
+         main = "Variance expliquée par dimension",
+         ylab = "Pourcentage de variance expliquée")
+```
+
+Les deux premiers axes expliquent à eux seuls plus de 60 % de l’information totale présente dans les données, ce qui est suffisant pour nous permettre d’explorer les profils des individus dans un plan en deux dimensions tout en conservant l’essentiel.
+
+###    3.4 Représentation conjointe des individus et des variables
+  
+
+```{r}
+fviz_pca_biplot(resultat_acp,
+                col.var = "#FF0000",
+                col.ind = "#E7B800",
+                repel = TRUE,
+                title = "Représentation conjointe variables-individus")
+```
+
+-   Les individus à droite du plan ont des valeurs élevées sur l’axe 1 : ce sont des salariés expérimentés, bien rémunérés, avec une forte ancienneté.
+-   Ceux en haut du graphique ont un nombre élevé d’entreprises précédentes, suggérant un profil mobile ou instable.
+
+Ce biplot permet de distinguer deux grandes typologies de salariés : - un groupe stable avec une carrière ascendante en interne, - un autre avec des parcours plus discontinus ou variés.
+
+###    3.5 Contribution des variables aux axes
+  
+
+```{r}
+fviz_contrib(resultat_acp, choice = "var", axes = 1, top = 5)
+fviz_contrib(resultat_acp, choice = "var", axes = 2, top = 5)
+```
+
+L’axe 1 est dominé par l’ancienneté, l’âge et le salaire, ce qui confirme notre lecture précédente : il représente une trajectoire professionnelle classique, où le temps passé dans l’entreprise s’accompagne d’un gain d’expérience et de rémunération.
+
+L’axe 2 est principalement influencé par le nombre d’employeurs précédents, mais aussi par la distance entre le domicile et le travail. Ce deuxième axe semble capter des dimensions liées à la mobilité géographique et professionnelle.
+
+###    3.6 Conclusion de l’ACP :
+    
+
+L’analyse en composantes principales a permis de résumer efficacement la diversité des parcours professionnels. Elle met en évidence deux grandes logiques dans l’entreprise : celle des employés stables et bien établis, et celle de profils plus mobiles. Cette distinction va nous être très utile pour la suite, notamment pour effectuer une classification des salariés en groupes homogènes, sur la base de ces axes synthétiques.
+
+# [4. Classification non supervisée : Clustering hiérarchique]{.underline}
+
+L’ACP a permis de projeter les individus dans un espace synthétique. Nous allons maintenant regrouper ces individus en profils similaires selon leurs positions sur les premiers axes factoriels, via un clustering hiérarchique.
+
+###   4.1  Méthode de Ward sur les composantes principales
+
+Pour construire cette classification, nous utilisons les coordonnées des individus sur les trois premiers axes de l’ACP. Cela revient à regrouper les individus en fonction de leurs profils synthétiques.
+
+```{r}
+coord_acp <- resultat_acp$ind$coord
+dist_mat <- dist(coord_acp[, 1:3])  # Distance sur les 3 premières dimensions
+hc_ward <- hclust(dist_mat, method = "ward.D")
+ggdendrogram(hc_ward, rotate = FALSE, size = 2) +
+  labs(title = "Arbre hiérarchique (méthode de Ward)")
+```
+
+La méthode de regroupement utilisée ici est celle de Ward, qui a l’avantage de créer des groupes les plus homogènes possibles, tout en maximisant la différence entre eux. Le résultat est un dendrogramme : une sorte d’arbre généalogique inversé, qui montre comment les individus se rassemblent progressivement en groupes. Cependant, lorsqu’on représente l’arbre obtenu avec tous les employés du jeu de données, le graphique devient très dense, et donc difficilement lisible.
+
+###     4.2 Étude sur un échantillon réduit
+     
+
+Pour illustrer le fonctionnement de la méthode sans en changer la nature, nous avons réalisé exactement le même traitement, mais cette fois sur un échantillon aléatoire de 25 individus. Cela permet de mieux visualiser comment les groupes se forment.
+
+```{r}
+# Tirage aléatoire de 50 individus (sans changer la méthode)
+set.seed(123)  # pour reproductibilité
+jeu_sample <- jeu %>% slice_sample(n = 25)
+
+# Refaire l'ACP sur ces individus uniquement
+donnees_sample <- jeu_sample %>% select(where(is.numeric))
+donnees_sample_std <- scale(donnees_sample)
+acp_sample <- PCA(donnees_sample_std, graph = FALSE)
+
+# Clustering hiérarchique sur les 3 premiers axes
+coord_sample <- acp_sample$ind$coord
+dist_sample <- dist(coord_sample[, 1:3])
+hc_sample <- hclust(dist_sample, method = "ward.D")
+
+# Affichage du dendrogramme
+ggdendrogram(hc_sample, rotate = FALSE, size = 2) +
+  labs(title = "Arbre hiérarchique sur un sous-échantillon (méthode de Ward)")
+```
+
+Maintenant on visualise mieux la logique du clustering : les individus sont d’abord regroupés deux à deux, puis fusionnés en sous-groupes, jusqu’à constituer une hiérarchie complète. On peut aussi repérer visuellement les “cassures” qui séparent les groupes bien distincts, ce qui nous aidera ensuite à choisir le bon nombre de clusters.
+
+###    4.3 Aide au choix du nombre de groupes
+
+Maintenant que l’arbre hiérarchique est construit, une question clé se pose : combien de groupes (ou clusters) faut-il retenir ? En effet, même si l’arbre regroupe tous les individus dans une hiérarchie complète, il faut à un moment “couper” cet arbre pour décider du nombre final de classes à analyser.
+
+Pour guider ce choix, on observe les sauts d’inertie. À chaque fusion entre deux groupes, on mesure combien l’hétérogénéité augmente. Un grand saut d’inertie signifie qu’on vient de fusionner deux groupes qui étaient bien distincts. En regardant où se trouvent les plus grands sauts, on peut repérer le bon endroit pour couper l’arbre.
+
+```{r}
+# Calcul des sauts d'inertie
+inertie <- sort(hc_ward$height, decreasing = TRUE)
+df_inertie <- tibble(x = 1:20, y = inertie[1:20])
+
+# Visualisation des plus grands sauts
+ggplot(df_inertie, aes(x = x, y = y)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "Sauts d'inertie inter-classe",
+       x = "Fusion", y = "Hauteur")
+```
+
+Sur le graphique, on voit que l’un des plus grands sauts se produit lorsqu’on passe de 3 à 2 groupes. Cela indique que le passage à deux classes regroupe des profils très différents, et qu’il est donc préférable de s’arrêter à l’étape précédente.
+
+###    4.4 Profilage des groupes
+
+Maintenant que les individus ont été regroupés en trois clusters, il est essentiel de comprendre à quoi correspondent ces groupes. Pour cela, on compare les moyennes des différentes variables numériques dans chaque groupe. L’idée est d’identifier les caractéristiques qui distinguent chaque classe : âge, ancienneté, salaire, nombre d’entreprises précédentes, etc.
+
+```{r}
+clusters <- cutree(hc_ward, k = 3)
+
+jeu$Cluster <- factor(clusters)
+
+jeu %>%
+  group_by(Cluster) %>%
+  summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE), .names = "moyenne_{.col}"))
+```
+
+Cette table résumée nous permet de brosser le portrait-type des individus dans chaque groupe.
+
+**Dans le Cluster 1,** on retrouve principalement des salariés âgés d’environ 35 à 40 ans, ayant un salaire correct, mais une ancienneté plutôt faible et un nombre important d’employeurs précédents. Ce sont probablement des profils expérimentés mais encore mobiles, ayant enchaîné plusieurs postes avant d’intégrer cette entreprise. On peut les voir comme des professionnels qualifiés, mais pas encore pleinement fidélisés.
+
+**Le Cluster 2** regroupe des employés plus jeunes, avec une ancienneté déjà bien installée dans l’entreprise et peu de changements d’employeurs passés. Ce sont sans doute des collaborateurs stables dès le départ, qui se sont engagés rapidement dans leur poste et montrent une certaine fidélité. Leur salaire reste modéré, mais en cohérence avec leur profil.
+
+**Enfin, le Cluster 3** correspond aux profils les plus expérimentés : des employés avec une ancienneté élevée, des salaires nettement supérieurs à la moyenne, et un âge plus avancé. Ces individus sont probablement des piliers de l’entreprise — cadres, experts techniques ou salariés de longue date — qui ont construit leur carrière en interne.
+
+###    4.5 Conclusion du clustering
+    
+
+Cette classification nous offre une lecture synthétique et puissante des parcours professionnels. Sans utiliser la moindre variable descriptive (département, statut, poste), l’algorithme a réussi à faire ressortir trois logiques de trajectoire : - des salariés mobiles et expérimentés mais récents, - des salariés jeunes mais déjà engagés dans la durée, - des salariés anciens, stables, et hautement rémunérés.
+
+#  
+
+#  [5. Conclusion Final]{.underline}
+  
+
+Àrrivée au terme de notre analyse générale, ensemble à travers notre analyse bivariée, nous avons commencé à entrevoir certaines dynamiques internes à l’entreprise. Par exemple, nous avons observé que plus un salarié a de l’ancienneté, plus il tend à percevoir un salaire élevé. Ce lien, bien que réel, n’explique pas à lui seul toutes les disparités observées. D’autres facteurs, comme le département ou le statut marital, influencent également le comportement des employés, notamment en matière d’attrition. Le fait d’être célibataire, par exemple, semble accroître la probabilité de quitter l’entreprise — une information précieuse en termes de ressources humaines.
+
+Mais pour aller au-delà de ces relations simples deux à deux, nous avons mobilisé des méthodes multivariées. L’analyse en composantes principales (ACP) nous a permis de dégager deux grandes dimensions cachées derrière les chiffres : une première liée à la stabilité et à la progression interne (âge, ancienneté, salaire), et une seconde plus axée sur la mobilité professionnelle (nombre d’employeurs précédents, distance domicile-travail). Ces axes résument la diversité des trajectoires sans en perdre la richesse.
+
+Sur cette base, nous avons construit une classification hiérarchique qui regroupe les individus selon leurs profils. Elle a révélé trois grands types d’employés : ceux qui sont encore mobiles et en phase d’intégration, ceux qui se sont stabilisés jeunes dans l’entreprise, et enfin ceux qui incarnent l’expérience et la longévité. Ces groupes ne sont pas le fruit d’un choix arbitraire, mais émergent directement des données. Ils traduisent des parcours réels et différenciés, qui peuvent inspirer des politiques RH plus fines : accompagner les jeunes pour les fidéliser, valoriser les profils expérimentés, ou encore mieux comprendre les facteurs d’instabilité chez les plus mobiles.
+
+En somme, cette étude a permis de passer d’un ensemble de données brutes à une lecture nuancée et structurée des profils présents dans l’entreprise. L’approche statistique, à travers l’analyse bivariée, l’ACP et le clustering, s’est révélée être un outil puissant pour éclairer la diversité des trajectoires humaines derrière les chiffres.
